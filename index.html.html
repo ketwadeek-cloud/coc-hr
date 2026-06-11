@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoC HR Dashboard — Live Data</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --tq:#33c0ca;--tq-dark:#1a8f97;--tq-darker:#0d6b72;--tq-light:#6dd8e0;
+  --tq-pale:rgba(51,192,202,0.12);--tq-border:rgba(51,192,202,0.22);
+  --rb:#b52324;--rb-dark:#8a1a1b;--rb-light:#d94445;
+  --rb-pale:rgba(181,35,36,0.12);--rb-border:rgba(181,35,36,0.25);
+  --bg:#07131a;--bg2:#0d1f2a;--bg3:#112530;--bg4:#162e3a;
+  --text:#e8f8fa;--text2:#8ecdd3;--muted:#4a7a82;--border:rgba(51,192,202,0.15);
+  --gold:#e8b84b;--gold-pale:rgba(232,184,75,0.12);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'IBM Plex Sans Thai','Kanit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow-x:hidden}
+
+/* SIDEBAR */
+.sidebar{width:220px;min-height:100vh;background:linear-gradient(180deg,#0b1e28,#071318);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100}
+.logo-wrap{padding:16px 14px;border-bottom:1px solid var(--border)}
+.logo-badge{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--tq-dark),var(--tq));display:flex;align-items:center;justify-content:center;font-family:'Kanit',sans-serif;font-weight:700;font-size:17px;color:#fff;box-shadow:0 0 16px rgba(51,192,202,0.35);margin-bottom:9px}
+.logo-wrap h2{font-family:'Kanit',sans-serif;font-size:12px;font-weight:600;color:var(--tq-light);line-height:1.5}
+.logo-wrap p{font-size:10px;color:var(--muted);margin-top:2px}
+.sidebar-nav{padding:12px 8px;flex:1}
+.nav-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:7px 10px 4px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;cursor:pointer;font-size:12px;color:#6a9fa6;transition:all .2s;margin-bottom:2px;border:1px solid transparent}
+.nav-item:hover{background:var(--tq-pale);color:var(--tq-light)}
+.nav-item.active{background:rgba(51,192,202,0.13);color:var(--tq);border-color:var(--tq-border)}
+.nav-icon{width:26px;height:26px;border-radius:7px;background:rgba(51,192,202,0.08);display:flex;align-items:center;justify-content:center;font-size:13px}
+.nav-item.active .nav-icon{background:rgba(51,192,202,0.18)}
+.sidebar-foot{padding:12px 14px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+.upd-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(51,192,202,0.09);border:1px solid var(--tq-border);border-radius:20px;padding:3px 9px;font-size:9.5px;color:var(--tq);margin-top:4px}
+
+/* MAIN */
+.main{margin-left:220px;flex:1;padding:14px 18px;min-height:100vh}
+.page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.page-hdr h1{font-family:'Kanit',sans-serif;font-size:20px;font-weight:700;background:linear-gradient(90deg,var(--tq-light),var(--tq));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.page-hdr p{font-size:11px;color:var(--muted);margin-top:3px}
+.cnt-badge{font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 12px;color:var(--tq-light);white-space:nowrap;align-self:flex-start}
+
+/* LOADING OVERLAY */
+.loading-overlay{position:fixed;inset:0;background:rgba(7,19,26,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+.loading-overlay.hidden{display:none}
+.spinner{width:48px;height:48px;border:3px solid var(--tq-border);border-top-color:var(--tq);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:'Kanit',sans-serif;font-size:16px;color:var(--tq-light)}
+.loading-sub{font-size:12px;color:var(--muted)}
+
+/* ERROR BANNER */
+.error-banner{background:var(--rb-pale);border:1px solid var(--rb-border);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#e06060;display:none}
+.error-banner.show{display:flex;align-items:center;gap:10px}
+.error-banner button{margin-left:auto;background:rgba(181,35,36,0.2);border:1px solid var(--rb-border);color:#e06060;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-family:inherit}
+
+/* DATA SOURCE CONFIG */
+.config-bar{background:var(--bg2);border:1px solid var(--tq-border);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.config-bar label{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--tq);white-space:nowrap}
+.config-bar input{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:inherit;font-size:11.5px;padding:5px 10px;flex:1;min-width:200px}
+.config-bar input:focus{outline:none;border-color:var(--tq)}
+.btn-reload{padding:6px 14px;border-radius:7px;background:linear-gradient(135deg,var(--tq-dark),var(--tq));border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .2s;white-space:nowrap}
+.btn-reload:hover{opacity:.85}
+.data-status{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.status-dot.live{background:#22c55e;box-shadow:0 0 6px #22c55e}
+.status-dot.error{background:var(--rb-light)}
+
+/* FILTERS */
+.filters{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.flabel{font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+select{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:inherit;font-size:12px;padding:5px 26px 5px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%2333c0ca' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;transition:border-color .2s}
+select:focus{outline:none;border-color:var(--tq)}
+.cpill{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;border:1px solid var(--border);cursor:pointer;font-size:11.5px;color:#6a9fa6;transition:all .2s;user-select:none}
+.cpill input{display:none}
+.cpill.on{border-color:var(--tq);background:var(--tq-pale);color:var(--tq-light)}
+.cdot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:all .2s}
+.cpill.on .cdot{background:var(--tq);box-shadow:0 0 5px var(--tq)}
+.freset{margin-left:auto;padding:5px 13px;border-radius:7px;background:var(--rb-pale);border:1px solid var(--rb-border);color:#d44445;font-size:11.5px;cursor:pointer;font-family:inherit;transition:all .2s}
+.freset:hover{background:rgba(181,35,36,0.2)}
+
+/* KPI */
+.kpi-row{display:grid;gap:10px;margin-bottom:10px}
+.kpi-row.col4{grid-template-columns:repeat(4,1fr)}
+.kpi-row.col5{grid-template-columns:repeat(5,1fr)}
+.kcard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;cursor:default}
+.kcard:hover{transform:translateY(-2px)}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kcard.tq::before{background:linear-gradient(90deg,var(--tq-dark),var(--tq-light))}
+.kcard.rb::before{background:linear-gradient(90deg,var(--rb-dark),var(--rb-light))}
+.kcard.gd::before{background:linear-gradient(90deg,#a07010,var(--gold))}
+.kcard.tq2::before{background:linear-gradient(90deg,var(--tq-darker),var(--tq))}
+.kcard.rb2::before{background:linear-gradient(90deg,#6a1212,#e05555)}
+.kcard:hover.tq{box-shadow:0 4px 18px rgba(51,192,202,0.2)}
+.kcard:hover.rb{box-shadow:0 4px 18px rgba(181,35,36,0.2)}
+.kico{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:6px}
+.kcard.tq .kico,.kcard.tq2 .kico{background:rgba(51,192,202,0.13)}
+.kcard.rb .kico,.kcard.rb2 .kico{background:var(--rb-pale)}
+.kcard.gd .kico{background:var(--gold-pale)}
+.klabel{font-size:10px;color:var(--muted);margin-bottom:3px;letter-spacing:.3px}
+.kval{font-family:'Kanit',sans-serif;font-size:26px;font-weight:700;line-height:1}
+.kcard.tq .kval,.kcard.tq2 .kval{color:var(--tq-light)}
+.kcard.rb .kval,.kcard.rb2 .kval{color:#e06060}
+.kcard.gd .kval{color:var(--gold)}
+.ksub{font-size:10px;color:var(--muted);margin-top:4px}
+.ksub .hi{color:var(--tq);font-weight:600}
+.ksub .hir{color:#d44445;font-weight:600}
+.kbar{margin-top:7px;height:3px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden}
+.kbar-fill{height:100%;border-radius:3px;transition:width 1s ease}
+.kcard.tq .kbar-fill,.kcard.tq2 .kbar-fill{background:linear-gradient(90deg,var(--tq-dark),var(--tq-light))}
+.kcard.rb .kbar-fill,.kcard.rb2 .kbar-fill{background:linear-gradient(90deg,var(--rb-dark),#e06060)}
+.kcard.gd .kbar-fill{background:linear-gradient(90deg,#a07010,var(--gold))}
+
+/* CHART CARDS */
+.crow{display:grid;gap:10px;margin-bottom:10px}
+.crow.c2{grid-template-columns:1fr 1fr}
+.crow.c3{grid-template-columns:1fr 1fr 1fr}
+.ccard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px}
+.chdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.ctitle{font-family:'Kanit',sans-serif;font-size:13px;font-weight:600;color:var(--text)}
+.csub{font-size:10px;color:var(--muted);margin-top:2px}
+.cbadge{font-size:9.5px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+.bdtq{background:rgba(51,192,202,0.13);color:var(--tq);border:1px solid var(--tq-border)}
+.bdrb{background:var(--rb-pale);color:#d44445;border:1px solid var(--rb-border)}
+.bdgd{background:var(--gold-pale);color:var(--gold);border:1px solid rgba(232,184,75,0.3)}
+
+/* SECTIONS */
+.sec{display:block}.sec.hidden{display:none}
+.sdiv{display:flex;align-items:center;gap:10px;margin:4px 0 10px}
+.sdiv h3{font-family:'Kanit',sans-serif;font-size:13px;font-weight:600;color:var(--tq-light);white-space:nowrap}
+.sdiv::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* TABLE */
+.twrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+thead th{background:rgba(51,192,202,0.07);padding:8px 12px;text-align:left;font-weight:600;font-size:10px;letter-spacing:.5px;color:var(--tq);border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid rgba(255,255,255,0.03);transition:background .15s}
+tbody tr:hover{background:rgba(51,192,202,0.04)}
+tbody td{padding:7px 12px;color:#a0c4ca}
+.tag{display:inline-flex;align-items:center;font-size:9.5px;padding:2px 7px;border-radius:20px;font-weight:500}
+.ttq{background:rgba(51,192,202,0.13);color:var(--tq)}
+.trb{background:var(--rb-pale);color:#d44445}
+.tgd{background:var(--gold-pale);color:var(--gold)}
+.tbl{background:rgba(96,165,250,0.12);color:#93c5fd}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:rgba(51,192,202,0.25);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">กำลังโหลดข้อมูล...</div>
+  <div class="loading-sub">ดึงข้อมูลจาก Google Sheets</div>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo-wrap">
+    <div class="logo-badge">CoC</div>
+    <h2>วิทยาลัยการคอมพิวเตอร์<br>PSU Phuket Campus</h2>
+    <p>HR Dashboard — Live Data</p>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">เมนูหลัก</div>
+    <div class="nav-item active" onclick="goSec('overview',this)">
+      <div class="nav-icon">📊</div>ภาพรวมบุคลากร
+    </div>
+    <div class="nav-item" onclick="goSec('academic',this)">
+      <div class="nav-icon">🎓</div>สายวิชาการ
+    </div>
+    <div class="nav-item" onclick="goSec('support',this)">
+      <div class="nav-icon">🏢</div>สายอำนวยการฯ
+    </div>
+    <div class="nav-item" onclick="goSec('dist',this)">
+      <div class="nav-icon">📈</div>การกระจายข้อมูล
+    </div>
+    <div class="nav-label" style="margin-top:12px">ข้อมูล</div>
+    <div class="nav-item" onclick="goSec('table',this)">
+      <div class="nav-icon">📋</div>ตารางรายชื่อ
+    </div>
+  </nav>
+  <div class="sidebar-foot">
+    <div id="last-updated">—</div>
+    <div class="upd-badge" id="live-badge">⚪ กำลังโหลด...</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="page-hdr">
+    <div>
+      <h1>HR Dashboard — CoC</h1>
+      <p>ข้อมูลบุคลากรวิทยาลัยการคอมพิวเตอร์ มหาวิทยาลัยสงขลานครินทร์ วิทยาเขตภูเก็ต</p>
+    </div>
+    <span id="cnt" class="cnt-badge">กำลังโหลด...</span>
+  </div>
+
+  <!-- CONFIG BAR: Google Sheets -->
+  <div class="config-bar">
+    <label>📊 Google Sheets ID</label>
+    <input type="text" id="sheet-id" 
+      value="1rSoPHFSYQ2Os6koCeiYAuu29-NTzwsZKif745Z09Sjg"
+      placeholder="วาง Spreadsheet ID ที่นี่">
+    <button class="btn-reload" onclick="loadFromSheets()">🔄 โหลดข้อมูล</button>
+    <div class="data-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">รอการเชื่อมต่อ</span>
+    </div>
+  </div>
+
+  <!-- ERROR BANNER -->
+  <div class="error-banner" id="err-banner">
+    <span>⚠️</span>
+    <span id="err-msg">ไม่สามารถโหลดข้อมูลได้</span>
+    <button onclick="useOfflineData()">ใช้ข้อมูลสำรอง</button>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <div>
+      <div class="flabel">ประเภทบุคลากร</div>
+      <select id="f-type" onchange="applyF()">
+        <option value="all">ทั้งหมด</option>
+        <option value="สายวิชาการ">สายวิชาการ</option>
+        <option value="สายอำนวยการฯ">สายอำนวยการฯ</option>
+      </select>
+    </div>
+    <div>
+      <div class="flabel">สาขา (อาจารย์)</div>
+      <select id="f-branch" onchange="applyF()">
+        <option value="all">ทั้งหมด</option>
+        <option value="DE">DE</option>
+        <option value="Comp">Comp</option>
+        <option value="DBiz">DBiz</option>
+      </select>
+    </div>
+    <div>
+      <div class="flabel">เพศ</div>
+      <select id="f-gender" onchange="applyF()">
+        <option value="all">ทั้งหมด</option>
+        <option value="ชาย">ชาย</option>
+        <option value="หญิง">หญิง</option>
+      </select>
+    </div>
+    <div>
+      <div class="flabel">การศึกษา</div>
+      <select id="f-edu" onchange="applyF()">
+        <option value="all">ทั้งหมด</option>
+        <option value="ปริญญาเอก">ปริญญาเอก</option>
+        <option value="ปริญญาโท">ปริญญาโท</option>
+        <option value="ปริญญาตรี">ปริญญาตรี</option>
+      </select>
+    </div>
+    <div>
+      <div class="flabel">ศาสนา</div>
+      <div style="display:flex;gap:6px">
+        <label class="cpill on" id="pill-พุทธ">
+          <input type="checkbox" value="พุทธ" checked onchange="togglePill(this)">
+          <div class="cdot"></div>พุทธ
+        </label>
+        <label class="cpill on" id="pill-อิสลาม">
+          <input type="checkbox" value="อิสลาม" checked onchange="togglePill(this)">
+          <div class="cdot"></div>อิสลาม
+        </label>
+      </div>
+    </div>
+    <button class="freset" onclick="resetF()">↺ รีเซ็ต</button>
+  </div>
+
+  <!-- ═══ SECTION: OVERVIEW ═══ -->
+  <div class="sec" id="sec-overview">
+    <div class="kpi-row col4">
+      <div class="kcard tq"><div class="kico">👥</div><div class="klabel">บุคลากรทั้งหมด</div><div class="kval" id="k-total">—</div><div class="ksub">วิทยาลัยการคอมพิวเตอร์</div><div class="kbar"><div class="kbar-fill" style="width:100%"></div></div></div>
+      <div class="kcard tq2"><div class="kico">🎓</div><div class="klabel">สายวิชาการ</div><div class="kval" id="k-aca">—</div><div class="ksub"><span class="hi" id="k-aca-pct">—</span> ของทั้งหมด</div><div class="kbar"><div class="kbar-fill" id="b-aca" style="width:0%"></div></div></div>
+      <div class="kcard rb"><div class="kico">🏢</div><div class="klabel">สายอำนวยการฯ</div><div class="kval" id="k-sup">—</div><div class="ksub"><span class="hir" id="k-sup-pct">—</span> ของทั้งหมด</div><div class="kbar"><div class="kbar-fill" id="b-sup" style="width:0%"></div></div></div>
+      <div class="kcard gd"><div class="kico">⭐</div><div class="klabel">มีตำแหน่งวิชาการ</div><div class="kval" id="k-rank">—</div><div class="ksub" id="k-rank-sub">รศ. — | ผศ. —</div><div class="kbar"><div class="kbar-fill" id="b-rank" style="width:0%"></div></div></div>
+    </div>
+    <div class="kpi-row col5">
+      <div class="kcard tq"><div class="kico">👨</div><div class="klabel">เพศชาย</div><div class="kval" id="k-m">—</div><div class="ksub" id="k-m-pct">—</div><div class="kbar"><div class="kbar-fill" id="b-m" style="width:0%"></div></div></div>
+      <div class="kcard rb"><div class="kico">👩</div><div class="klabel">เพศหญิง</div><div class="kval" id="k-f">—</div><div class="ksub" id="k-f-pct">—</div><div class="kbar"><div class="kbar-fill" id="b-f" style="width:0%"></div></div></div>
+      <div class="kcard tq2"><div class="kico">☸️</div><div class="klabel">ศาสนาพุทธ</div><div class="kval" id="k-bud">—</div><div class="ksub" id="k-bud-pct">—</div><div class="kbar"><div class="kbar-fill" id="b-bud" style="width:0%"></div></div></div>
+      <div class="kcard gd"><div class="kico">☪️</div><div class="klabel">ศาสนาอิสลาม</div><div class="kval" id="k-isl">—</div><div class="ksub" id="k-isl-pct">—</div><div class="kbar"><div class="kbar-fill" id="b-isl" style="width:0%"></div></div></div>
+      <div class="kcard rb2"><div class="kico">🔼</div><div class="klabel">ตำแหน่งสูงขึ้น</div><div class="kval" id="k-adv">—</div><div class="ksub"><span class="hir">ชำนาญการ</span></div><div class="kbar"><div class="kbar-fill" id="b-adv" style="width:0%"></div></div></div>
+    </div>
+    <div class="sdiv"><h3>📊 แผนภูมิภาพรวม</h3></div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">สัดส่วนประเภทบุคลากร</div><div class="csub">Donut</div></div><span class="cbadge bdtq" id="badge-total">—</span></div><canvas id="c-donut-type" height="160"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">เพศ × ประเภทบุคลากร</div><div class="csub">Stacked Bar</div></div><span class="cbadge bdtq">แยกตามเพศ</span></div><canvas id="c-bar-gt" height="160"></canvas></div>
+    </div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">สัดส่วนศาสนา</div><div class="csub">Pie</div></div><span class="cbadge bdtq">ภาพรวม</span></div><canvas id="c-pie-rel" height="160"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">จำนวนตามสาขา × เพศ</div><div class="csub">Bar — DE / Comp / DBiz</div></div><span class="cbadge bdtq">สายวิชาการ</span></div><canvas id="c-bar-bg" height="160"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION: ACADEMIC ═══ -->
+  <div class="sec hidden" id="sec-academic">
+    <div class="sdiv"><h3>🎓 สายวิชาการ — ตำแหน่ง & การศึกษา</h3></div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">Radar — สมรรถนะตำแหน่งวิชาการ</div><div class="csub">สัดส่วนระดับตำแหน่ง</div></div><span class="cbadge bdtq" id="badge-aca">—</span></div><canvas id="c-radar-rank" height="200"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">ตำแหน่งวิชาการ Bar Chart</div><div class="csub">รศ. / ผศ. / ดร. / อาจารย์</div></div><span class="cbadge bdtq">ข้อมูลจริง</span></div><canvas id="c-bar-arank" height="200"></canvas></div>
+    </div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">ระดับการศึกษาสายวิชาการ</div><div class="csub">Donut — ป.เอก vs ป.โท</div></div><span class="cbadge bdtq">Donut</span></div><canvas id="c-donut-edu-a" height="160"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">แหล่งเงินจ้าง สายวิชาการ</div><div class="csub">Bar — งบประมาณ / รายได้ / เปลี่ยนสถานภาพ</div></div><span class="cbadge bdrb">สัดส่วน</span></div><canvas id="c-bar-fund" height="160"></canvas></div>
+    </div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">Line — บุคลากรตามสาขา</div><div class="csub">ชาย / หญิง / รวม</div></div><span class="cbadge bdtq">Line Chart</span></div><canvas id="c-line-branch" height="160"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">ตำแหน่งบริหาร vs ไม่มีตำแหน่ง</div><div class="csub">Donut</div></div><span class="cbadge bdtq">Donut</span></div><canvas id="c-donut-admin" height="160"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION: SUPPORT ═══ -->
+  <div class="sec hidden" id="sec-support">
+    <div class="sdiv"><h3>🏢 สายอำนวยการฯ</h3></div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">กลุ่มงาน</div><div class="csub">Horizontal Bar</div></div><span class="cbadge bdrb" id="badge-sup">—</span></div><canvas id="c-bar-spos" height="210"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">ระดับการศึกษา</div><div class="csub">Donut — ป.ตรี / ป.โท</div></div><span class="cbadge bdrb">Donut</span></div><canvas id="c-donut-edu-s" height="210"></canvas></div>
+    </div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">ระดับตำแหน่ง</div><div class="csub">ปฏิบัติการ / ชำนาญการ</div></div><span class="cbadge bdrb">Donut</span></div><canvas id="c-donut-slv" height="160"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">เพศ × ระดับการศึกษา</div><div class="csub">Stacked Bar</div></div><span class="cbadge bdrb">เปรียบเทียบ</span></div><canvas id="c-bar-sge" height="160"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION: DISTRIBUTION ═══ -->
+  <div class="sec hidden" id="sec-dist">
+    <div class="sdiv"><h3>📈 การกระจายตัวของข้อมูล</h3></div>
+    <div class="crow c2">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">Stacked — เพศ × ตำแหน่งวิชาการ</div><div class="csub">เปรียบเทียบชาย-หญิงแต่ละระดับ</div></div><span class="cbadge bdtq">ทั้งหมด</span></div><canvas id="c-stk-gr" height="180"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">Radar — ภาพรวมทุกมิติ</div><div class="csub">สัดส่วนร้อยละ</div></div><span class="cbadge bdtq">Overview</span></div><canvas id="c-radar-ov" height="180"></canvas></div>
+    </div>
+    <div class="crow c3">
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">ศาสนา × ประเภท</div><div class="csub">Stacked Bar</div></div></div><canvas id="c-bar-reltype" height="160"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">สัดส่วนปริญญาเอก</div><div class="csub">Donut รวมทุกคน</div></div></div><canvas id="c-donut-phd" height="160"></canvas></div>
+      <div class="ccard"><div class="chdr"><div><div class="ctitle">แหล่งเงินจ้าง ภาพรวม</div><div class="csub">Pie</div></div></div><canvas id="c-pie-fund" height="160"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION: TABLE ═══ -->
+  <div class="sec hidden" id="sec-table">
+    <div class="sdiv"><h3>📋 ตารางรายชื่อบุคลากร</h3></div>
+    <div class="ccard">
+      <div class="twrap">
+        <table>
+          <thead><tr><th>#</th><th>ชื่อ-สกุล</th><th>ประเภท</th><th>เพศ</th><th>ศาสนา</th><th>ตำแหน่ง / ระดับ</th><th>สาขา / กลุ่มงาน</th><th>การศึกษา</th></tr></thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ══════════════════════
+// CONFIG
+// ══════════════════════
+// Sheet ชื่อ "รวมเจ้าหน้าที่ +อาจารย์" GID
+const SHEET_NAME = 'รวมเจ้าหน้าที่ +อาจารย์';
+
+// Column mapping (0-based index จาก Sheet)
+// ลำดับ,เพศ,ศาสนา,ประเภท,แหล่งเงินจ้าง,ตำแหน่งวิชาการ,คำนำหน้า,ชื่อ-สกุล,สาขา,ระดับการศึกษา,ตำแหน่งบริหาร,...
+const COL = { id:0, g:1, rel:2, type:3, fund:4, rank:5, pfx:6, name:7, br:8, edu:9, admin:10 };
+
+// ══════════════════════
+// CHART COLORS
+// ══════════════════════
+const TQ='rgba(51,192,202,0.82)',TQL='rgba(109,216,224,0.82)',TQD='rgba(26,143,151,0.82)';
+const RB='rgba(181,35,36,0.82)',RBL='rgba(217,68,69,0.82)';
+const GD='rgba(232,184,75,0.85)';
+const TOOLTIP={backgroundColor:'#0d1f2a',borderColor:'rgba(51,192,202,0.3)',borderWidth:1,
+  titleColor:'#6dd8e0',bodyColor:'#a0c4ca',
+  titleFont:{family:'Kanit',size:12},bodyFont:{family:'IBM Plex Sans Thai',size:11},padding:10};
+const SCALES={
+  x:{ticks:{color:'#4a7a82',font:{family:'IBM Plex Sans Thai',size:11}},grid:{color:'rgba(51,192,202,0.06)'}},
+  y:{ticks:{color:'#4a7a82',font:{family:'IBM Plex Sans Thai',size:11}},grid:{color:'rgba(51,192,202,0.06)'}}
+};
+const LEGOPT={labels:{color:'#6a9fa6',font:{family:'IBM Plex Sans Thai',size:11}}};
+
+let RAW=[], DATA=[], CHARTS={};
+
+// ══════════════════════
+// LOAD FROM GOOGLE SHEETS (gviz/tq — ไม่ต้องใช้ API key)
+// ══════════════════════
+async function loadFromSheets() {
+  const sheetId = document.getElementById('sheet-id').value.trim();
+  if (!sheetId) { showError('กรุณาใส่ Spreadsheet ID'); return; }
+
+  setStatus('loading');
+  document.getElementById('loading').classList.remove('hidden');
+  hideError();
+
+  // encode sheet name for URL
+  const sheetEnc = encodeURIComponent(SHEET_NAME);
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetEnc}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+
+    // gviz returns: google.visualization.Query.setResponse({...})
+    const jsonStr = text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, '');
+    const json = JSON.parse(jsonStr);
+
+    if (!json.table || !json.table.rows) throw new Error('ไม่มีข้อมูลในชีท');
+
+    RAW = parseGviz(json.table);
+    if (RAW.length === 0) throw new Error('ไม่พบแถวข้อมูล (ตรวจสอบชื่อชีท)');
+
+    DATA = [...RAW];
+    setStatus('live');
+    updateTimestamp();
+    hideError();
+    applyF();
+    document.getElementById('loading').classList.add('hidden');
+
+  } catch(e) {
+    console.error(e);
+    document.getElementById('loading').classList.add('hidden');
+    setStatus('error');
+    showError(`โหลดไม่ได้: ${e.message} — ตรวจสอบว่า Sheet ตั้งค่า "Anyone with link → Viewer" แล้ว`);
+    useOfflineData();
+  }
+}
+
+function parseGviz(table) {
+  const rows = table.rows || [];
+  const result = [];
+  rows.forEach((row, i) => {
+    if (!row.c) return;
+    const get = (idx) => {
+      const cell = row.c[idx];
+      if (!cell || cell.v === null || cell.v === undefined) return '';
+      return String(cell.v).trim();
+    };
+    const id = get(COL.id);
+    if (!id || isNaN(Number(id))) return; // skip header/empty rows
+    const name = get(COL.name);
+    if (!name) return;
+
+    result.push({
+      id: Number(id),
+      g: get(COL.g),
+      rel: get(COL.rel),
+      type: get(COL.type),
+      fund: get(COL.fund),
+      rank: get(COL.rank),
+      pfx: get(COL.pfx),
+      name: name,
+      br: get(COL.br),
+      edu: get(COL.edu),
+      admin: get(COL.admin) || '-'
+    });
+  });
+  return result;
+}
+
+// ══════════════════════
+// OFFLINE FALLBACK DATA (ข้อมูลสำรอง)
+// ══════════════════════
+function useOfflineData() {
+  RAW = OFFLINE_DATA;
+  DATA = [...RAW];
+  setStatus('offline');
+  applyF();
+  document.getElementById('loading').classList.add('hidden');
+}
+
+function setStatus(s) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  const badge = document.getElementById('live-badge');
+  if (s==='live') {
+    dot.className='status-dot live'; txt.textContent='ข้อมูลสด';
+    badge.textContent='🟢 Live Data';
+  } else if (s==='offline') {
+    dot.className='status-dot'; txt.textContent='ข้อมูลสำรอง';
+    badge.textContent='🟡 Offline Data';
+  } else if (s==='error') {
+    dot.className='status-dot error'; txt.textContent='เชื่อมต่อไม่ได้';
+    badge.textContent='🔴 Connection Error';
+  } else {
+    dot.className='status-dot'; txt.textContent='กำลังโหลด...';
+    badge.textContent='⚪ กำลังโหลด...';
+  }
+}
+
+function updateTimestamp() {
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    'อัพเดท: ' + now.toLocaleTimeString('th-TH');
+}
+
+function showError(msg) {
+  document.getElementById('err-msg').textContent = msg;
+  document.getElementById('err-banner').classList.add('show');
+}
+function hideError() {
+  document.getElementById('err-banner').classList.remove('show');
+}
+
+// ══════════════════════
+// FILTER
+// ══════════════════════
+function getF() {
+  const t=document.getElementById('f-type').value;
+  const b=document.getElementById('f-branch').value;
+  const gv=document.getElementById('f-gender').value;
+  const ev=document.getElementById('f-edu').value;
+  const rels=[...document.querySelectorAll('.cpill.on input')].map(i=>i.value);
+  return RAW.filter(d=>{
+    if(t!=='all'&&d.type!==t)return false;
+    if(b!=='all'&&d.type==='สายวิชาการ'&&d.br!==b)return false;
+    if(gv!=='all'&&d.g!==gv)return false;
+    if(ev!=='all'&&d.edu!==ev)return false;
+    if(!rels.includes(d.rel))return false;
+    return true;
+  });
+}
+function togglePill(inp){inp.closest('.cpill').classList.toggle('on',inp.checked);applyF();}
+function applyF(){
+  DATA=getF();
+  document.getElementById('cnt').textContent=`แสดง ${DATA.length} / ${RAW.length} คน`;
+  document.getElementById('badge-total').textContent=`รวม ${RAW.length} คน`;
+  document.getElementById('badge-aca').textContent=`${RAW.filter(x=>x.type==='สายวิชาการ').length} คน`;
+  document.getElementById('badge-sup').textContent=`${RAW.filter(x=>x.type==='สายอำนวยการฯ').length} คน`;
+  updateKPI(); rebuildAll(); buildTable();
+}
+function resetF(){
+  document.getElementById('f-type').value='all';
+  document.getElementById('f-branch').value='all';
+  document.getElementById('f-gender').value='all';
+  document.getElementById('f-edu').value='all';
+  document.querySelectorAll('.cpill input').forEach(i=>{i.checked=true;i.closest('.cpill').classList.add('on');});
+  applyF();
+}
+
+// ══════════════════════
+// KPI
+// ══════════════════════
+function pct(v,tot){return tot>0?Math.round(v/tot*100):0;}
+function updateKPI(){
+  const d=DATA,n=Math.max(d.length,1);
+  const aca=d.filter(x=>x.type==='สายวิชาการ').length;
+  const sup=d.filter(x=>x.type==='สายอำนวยการฯ').length;
+  const rso=d.filter(x=>x.rank==='รองศาสตราจารย์'||x.rank.includes('รองศาสตราจารย์')).length;
+  const pso=d.filter(x=>x.rank==='ผู้ช่วยศาสตราจารย์'||x.rank.includes('ผู้ช่วยศาสตราจารย์')).length;
+  const rnk=rso+pso;
+  const m=d.filter(x=>x.g==='ชาย').length;
+  const f=d.filter(x=>x.g==='หญิง').length;
+  const bud=d.filter(x=>x.rel==='พุทธ').length;
+  const isl=d.filter(x=>x.rel==='อิสลาม').length;
+  const adv=d.filter(x=>x.rank==='ชำนาญการ'||x.rank.includes('ชำนาญการ')).length;
+
+  document.getElementById('k-total').textContent=n;
+  document.getElementById('k-aca').textContent=aca;
+  document.getElementById('k-sup').textContent=sup;
+  document.getElementById('k-rank').textContent=rnk;
+  document.getElementById('k-m').textContent=m;
+  document.getElementById('k-f').textContent=f;
+  document.getElementById('k-bud').textContent=bud;
+  document.getElementById('k-isl').textContent=isl;
+  document.getElementById('k-adv').textContent=adv;
+
+  document.getElementById('k-aca-pct').textContent=pct(aca,n)+'%';
+  document.getElementById('k-sup-pct').textContent=pct(sup,n)+'%';
+  document.getElementById('k-rank-sub').textContent=`รศ. ${rso} | ผศ. ${pso} คน`;
+  document.getElementById('k-m-pct').textContent=pct(m,n)+'% ของทั้งหมด';
+  document.getElementById('k-f-pct').textContent=pct(f,n)+'% ของทั้งหมด';
+  document.getElementById('k-bud-pct').textContent=pct(bud,n)+'% ของทั้งหมด';
+  document.getElementById('k-isl-pct').textContent=pct(isl,n)+'% ของทั้งหมด';
+
+  ['b-aca','b-sup','b-rank','b-m','b-f','b-bud','b-isl','b-adv'].forEach((id,i)=>{
+    const v=[pct(aca,n),pct(sup,n),pct(rnk,n),pct(m,n),pct(f,n),pct(bud,n),pct(isl,n),pct(adv,sup||1)];
+    document.getElementById(id).style.width=v[i]+'%';
+  });
+}
+
+// ══════════════════════
+// CHARTS
+// ══════════════════════
+function dc(id){if(CHARTS[id]){CHARTS[id].destroy();delete CHARTS[id];}}
+function cnt(d,k,v){return d.filter(x=>x[k]===v).length;}
+function cntLike(d,k,v){return d.filter(x=>x[k]&&x[k].includes(v)).length;}
+
+function rebuildAll(){buildOverview();buildAcademic();buildSupport();buildDist();}
+
+function buildOverview(){
+  const d=DATA;
+  dc('c-donut-type');
+  CHARTS['c-donut-type']=new Chart(document.getElementById('c-donut-type'),{
+    type:'doughnut',
+    data:{labels:['สายวิชาการ','สายอำนวยการฯ'],
+      datasets:[{data:[cnt(d,'type','สายวิชาการ'),cnt(d,'type','สายอำนวยการฯ')],
+        backgroundColor:[TQ,RB],borderColor:['#33c0ca','#b52324'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,cutout:'65%',plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+  dc('c-bar-gt');
+  const types=['สายวิชาการ','สายอำนวยการฯ'];
+  CHARTS['c-bar-gt']=new Chart(document.getElementById('c-bar-gt'),{
+    type:'bar',
+    data:{labels:types,datasets:[
+      {label:'ชาย',data:types.map(t=>d.filter(x=>x.type===t&&x.g==='ชาย').length),backgroundColor:TQ,borderColor:'#33c0ca',borderWidth:1},
+      {label:'หญิง',data:types.map(t=>d.filter(x=>x.type===t&&x.g==='หญิง').length),backgroundColor:RB,borderColor:'#b52324',borderWidth:1}
+    ]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},
+      scales:{x:{...SCALES.x,stacked:true},y:{...SCALES.y,stacked:true}}}
+  });
+  dc('c-pie-rel');
+  CHARTS['c-pie-rel']=new Chart(document.getElementById('c-pie-rel'),{
+    type:'pie',
+    data:{labels:['พุทธ','อิสลาม'],
+      datasets:[{data:[cnt(d,'rel','พุทธ'),cnt(d,'rel','อิสลาม')],
+        backgroundColor:[TQ,GD],borderColor:['#33c0ca','#e8b84b'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+  dc('c-bar-bg');
+  const brs=['DE','Comp','DBiz'];
+  const aD=d.filter(x=>x.type==='สายวิชาการ');
+  CHARTS['c-bar-bg']=new Chart(document.getElementById('c-bar-bg'),{
+    type:'bar',
+    data:{labels:brs,datasets:[
+      {label:'ชาย',data:brs.map(b=>aD.filter(x=>x.br===b&&x.g==='ชาย').length),backgroundColor:TQ,borderColor:'#33c0ca',borderWidth:1,borderRadius:4},
+      {label:'หญิง',data:brs.map(b=>aD.filter(x=>x.br===b&&x.g==='หญิง').length),backgroundColor:RB,borderColor:'#b52324',borderWidth:1,borderRadius:4}
+    ]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},scales:SCALES}
+  });
+}
+
+function buildAcademic(){
+  const d=DATA, a=d.filter(x=>x.type==='สายวิชาการ');
+  dc('c-radar-rank');
+  CHARTS['c-radar-rank']=new Chart(document.getElementById('c-radar-rank'),{
+    type:'radar',
+    data:{
+      labels:['รศ.ดร.','ผศ.ดร.','ดร.(อาจารย์)','อาจารย์(ป.โท)','ผศ.(ป.โท)','มีตำแหน่งบริหาร'],
+      datasets:[{label:'จำนวน (คน)',
+        data:[
+          a.filter(x=>x.rank.includes('รองศาสตราจารย์')).length,
+          a.filter(x=>x.rank.includes('ผู้ช่วยศาสตราจารย์')&&x.edu==='ปริญญาเอก').length,
+          a.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาเอก').length,
+          a.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาโท').length,
+          a.filter(x=>x.pfx.includes('ผศ.')&&x.edu==='ปริญญาโท').length,
+          a.filter(x=>x.admin&&x.admin!=='-').length
+        ],
+        backgroundColor:'rgba(51,192,202,0.18)',borderColor:'#33c0ca',
+        pointBackgroundColor:'#33c0ca',pointBorderColor:'#fff',borderWidth:2
+      }]
+    },
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},
+      scales:{r:{angleLines:{color:'rgba(51,192,202,0.12)'},grid:{color:'rgba(51,192,202,0.08)'},
+        pointLabels:{color:'#6a9fa6',font:{size:10}},
+        ticks:{color:'#4a7a82',font:{size:9},backdropColor:'transparent'}}}}
+  });
+  dc('c-bar-arank');
+  CHARTS['c-bar-arank']=new Chart(document.getElementById('c-bar-arank'),{
+    type:'bar',
+    data:{labels:['รศ.ดร.','ผศ.ดร.','ดร.(อาจารย์)','อาจารย์(ป.โท)','ผศ.(ป.โท)'],
+      datasets:[{label:'จำนวน',
+        data:[
+          a.filter(x=>x.rank.includes('รองศาสตราจารย์')).length,
+          a.filter(x=>x.rank.includes('ผู้ช่วยศาสตราจารย์')&&x.edu==='ปริญญาเอก').length,
+          a.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาเอก').length,
+          a.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาโท').length,
+          a.filter(x=>x.pfx.includes('ผศ.')&&x.edu==='ปริญญาโท').length,
+        ],
+        backgroundColor:[TQL,TQ,GD,RBL,RB],
+        borderColor:['#6dd8e0','#33c0ca','#e8b84b','#d94445','#b52324'],
+        borderWidth:2,borderRadius:5}]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:{display:false}},scales:SCALES}
+  });
+  dc('c-donut-edu-a');
+  CHARTS['c-donut-edu-a']=new Chart(document.getElementById('c-donut-edu-a'),{
+    type:'doughnut',
+    data:{labels:['ปริญญาเอก','ปริญญาโท'],
+      datasets:[{data:[cnt(a,'edu','ปริญญาเอก'),cnt(a,'edu','ปริญญาโท')],
+        backgroundColor:[TQ,GD],borderColor:['#33c0ca','#e8b84b'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,cutout:'65%',plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+  dc('c-bar-fund');
+  CHARTS['c-bar-fund']=new Chart(document.getElementById('c-bar-fund'),{
+    type:'bar',
+    data:{labels:['เงินประมาณแผ่นดิน','เงินรายได้','เปลี่ยนสถานภาพ'],
+      datasets:[{label:'จำนวน',
+        data:[
+          a.filter(x=>x.fund&&x.fund.includes('ประมาณแผ่นดิน')).length,
+          a.filter(x=>x.fund&&x.fund.includes('รายได้')).length,
+          a.filter(x=>x.fund&&x.fund.includes('เปลี่ยน')).length
+        ],
+        backgroundColor:[TQ,GD,RB],borderColor:['#33c0ca','#e8b84b','#b52324'],borderWidth:2,borderRadius:5}]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:{display:false}},scales:SCALES}
+  });
+  dc('c-line-branch');
+  const brs=['DE','Comp','DBiz'];
+  CHARTS['c-line-branch']=new Chart(document.getElementById('c-line-branch'),{
+    type:'line',
+    data:{labels:brs,datasets:[
+      {label:'ชาย',data:brs.map(b=>a.filter(x=>x.br===b&&x.g==='ชาย').length),borderColor:'#33c0ca',backgroundColor:'rgba(51,192,202,0.08)',fill:true,tension:.4,pointBackgroundColor:'#33c0ca',pointRadius:5},
+      {label:'หญิง',data:brs.map(b=>a.filter(x=>x.br===b&&x.g==='หญิง').length),borderColor:'#b52324',backgroundColor:'rgba(181,35,36,0.08)',fill:true,tension:.4,pointBackgroundColor:'#b52324',pointRadius:5},
+      {label:'รวม',data:brs.map(b=>a.filter(x=>x.br===b).length),borderColor:GD,fill:false,tension:.4,pointBackgroundColor:GD,pointRadius:5,borderDash:[5,3]}
+    ]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},scales:SCALES}
+  });
+  dc('c-donut-admin');
+  const hasA=a.filter(x=>x.admin&&x.admin!=='-').length;
+  CHARTS['c-donut-admin']=new Chart(document.getElementById('c-donut-admin'),{
+    type:'doughnut',
+    data:{labels:['มีตำแหน่งบริหาร','ไม่มีตำแหน่งบริหาร'],
+      datasets:[{data:[hasA,a.length-hasA],backgroundColor:[TQ,RB],borderColor:['#33c0ca','#b52324'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,cutout:'65%',plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+}
+
+function buildSupport(){
+  const s=DATA.filter(x=>x.type==='สายอำนวยการฯ');
+  dc('c-bar-spos');
+  const grps={};s.forEach(x=>{grps[x.br]=(grps[x.br]||0)+1;});
+  const gl=Object.keys(grps);
+  CHARTS['c-bar-spos']=new Chart(document.getElementById('c-bar-spos'),{
+    type:'bar',
+    data:{labels:gl,datasets:[{label:'จำนวน',data:gl.map(g=>grps[g]),backgroundColor:RB,borderColor:'#b52324',borderWidth:1,borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,plugins:{tooltip:TOOLTIP,legend:{display:false}},
+      scales:{x:{...SCALES.x,ticks:{...SCALES.x.ticks,stepSize:1}},y:SCALES.y}}
+  });
+  dc('c-donut-edu-s');
+  CHARTS['c-donut-edu-s']=new Chart(document.getElementById('c-donut-edu-s'),{
+    type:'doughnut',
+    data:{labels:['ปริญญาตรี','ปริญญาโท'],
+      datasets:[{data:[cnt(s,'edu','ปริญญาตรี'),cnt(s,'edu','ปริญญาโท')],
+        backgroundColor:[RB,GD],borderColor:['#b52324','#e8b84b'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,cutout:'65%',plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+  dc('c-donut-slv');
+  CHARTS['c-donut-slv']=new Chart(document.getElementById('c-donut-slv'),{
+    type:'doughnut',
+    data:{labels:['ปฏิบัติการ','ชำนาญการ'],
+      datasets:[{data:[cnt(s,'rank','ปฏิบัติการ'),s.filter(x=>x.rank.includes('ชำนาญการ')).length],
+        backgroundColor:[RB,TQ],borderColor:['#b52324','#33c0ca'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,cutout:'65%',plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+  dc('c-bar-sge');
+  const eds=['ปริญญาตรี','ปริญญาโท'];
+  CHARTS['c-bar-sge']=new Chart(document.getElementById('c-bar-sge'),{
+    type:'bar',
+    data:{labels:eds,datasets:[
+      {label:'ชาย',data:eds.map(e=>s.filter(x=>x.edu===e&&x.g==='ชาย').length),backgroundColor:TQ,borderColor:'#33c0ca',borderWidth:1},
+      {label:'หญิง',data:eds.map(e=>s.filter(x=>x.edu===e&&x.g==='หญิง').length),backgroundColor:RB,borderColor:'#b52324',borderWidth:1}
+    ]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},
+      scales:{x:{...SCALES.x,stacked:true},y:{...SCALES.y,stacked:true}}}
+  });
+}
+
+function buildDist(){
+  const d=DATA;
+  dc('c-stk-gr');
+  const rc=['รศ.ดร.','ผศ.ดร./ผศ.','ดร.(อาจารย์)','อาจารย์(ป.โท)','สายอำนวยการฯ'];
+  const mv=c=>{
+    if(c==='รศ.ดร.')return d.filter(x=>x.rank.includes('รองศาสตราจารย์')&&x.g==='ชาย').length;
+    if(c==='ผศ.ดร./ผศ.')return d.filter(x=>x.rank.includes('ผู้ช่วยศาสตราจารย์')&&x.g==='ชาย').length;
+    if(c==='ดร.(อาจารย์)')return d.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาเอก'&&x.g==='ชาย').length;
+    if(c==='อาจารย์(ป.โท)')return d.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาโท'&&x.g==='ชาย').length;
+    return d.filter(x=>x.type==='สายอำนวยการฯ'&&x.g==='ชาย').length;
+  };
+  const fv=c=>{
+    if(c==='รศ.ดร.')return d.filter(x=>x.rank.includes('รองศาสตราจารย์')&&x.g==='หญิง').length;
+    if(c==='ผศ.ดร./ผศ.')return d.filter(x=>x.rank.includes('ผู้ช่วยศาสตราจารย์')&&x.g==='หญิง').length;
+    if(c==='ดร.(อาจารย์)')return d.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาเอก'&&x.g==='หญิง').length;
+    if(c==='อาจารย์(ป.โท)')return d.filter(x=>x.rank==='อาจารย์'&&x.edu==='ปริญญาโท'&&x.g==='หญิง').length;
+    return d.filter(x=>x.type==='สายอำนวยการฯ'&&x.g==='หญิง').length;
+  };
+  CHARTS['c-stk-gr']=new Chart(document.getElementById('c-stk-gr'),{
+    type:'bar',
+    data:{labels:rc,datasets:[
+      {label:'ชาย',data:rc.map(mv),backgroundColor:TQ,borderColor:'#33c0ca',borderWidth:1},
+      {label:'หญิง',data:rc.map(fv),backgroundColor:RB,borderColor:'#b52324',borderWidth:1}
+    ]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},
+      scales:{x:{...SCALES.x,stacked:true},y:{...SCALES.y,stacked:true}}}
+  });
+  dc('c-radar-ov');
+  const n=Math.max(d.length,1);
+  CHARTS['c-radar-ov']=new Chart(document.getElementById('c-radar-ov'),{
+    type:'radar',
+    data:{
+      labels:['สายวิชาการ','ป.เอก','ผศ.ขึ้นไป','เพศชาย','ศาสนาพุทธ','มีตำแหน่งบริหาร'],
+      datasets:[{label:'%',
+        data:[
+          Math.round(d.filter(x=>x.type==='สายวิชาการ').length/n*100),
+          Math.round(d.filter(x=>x.edu==='ปริญญาเอก').length/n*100),
+          Math.round(d.filter(x=>x.rank.includes('ศาสตราจารย์')).length/n*100),
+          Math.round(d.filter(x=>x.g==='ชาย').length/n*100),
+          Math.round(d.filter(x=>x.rel==='พุทธ').length/n*100),
+          Math.round(d.filter(x=>x.admin&&x.admin!=='-').length/n*100)
+        ],
+        backgroundColor:'rgba(51,192,202,0.15)',borderColor:'#33c0ca',
+        pointBackgroundColor:'#33c0ca',pointBorderColor:'#fff',borderWidth:2
+      }]
+    },
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},
+      scales:{r:{min:0,max:100,
+        angleLines:{color:'rgba(51,192,202,0.1)'},grid:{color:'rgba(51,192,202,0.07)'},
+        pointLabels:{color:'#6a9fa6',font:{size:10}},
+        ticks:{color:'#4a7a82',font:{size:9},backdropColor:'transparent',stepSize:20}}}}
+  });
+  dc('c-bar-reltype');
+  const ty=['สายวิชาการ','สายอำนวยการฯ'];
+  CHARTS['c-bar-reltype']=new Chart(document.getElementById('c-bar-reltype'),{
+    type:'bar',
+    data:{labels:ty,datasets:[
+      {label:'พุทธ',data:ty.map(t=>d.filter(x=>x.type===t&&x.rel==='พุทธ').length),backgroundColor:TQ,borderColor:'#33c0ca',borderWidth:1},
+      {label:'อิสลาม',data:ty.map(t=>d.filter(x=>x.type===t&&x.rel==='อิสลาม').length),backgroundColor:GD,borderColor:'#e8b84b',borderWidth:1}
+    ]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:LEGOPT},
+      scales:{x:{...SCALES.x,stacked:true},y:{...SCALES.y,stacked:true}}}
+  });
+  dc('c-donut-phd');
+  const phd=d.filter(x=>x.edu==='ปริญญาเอก').length;
+  CHARTS['c-donut-phd']=new Chart(document.getElementById('c-donut-phd'),{
+    type:'doughnut',
+    data:{labels:['ปริญญาเอก','ต่ำกว่าป.เอก'],
+      datasets:[{data:[phd,d.length-phd],backgroundColor:[TQ,RB],borderColor:['#33c0ca','#b52324'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,cutout:'65%',plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+  dc('c-pie-fund');
+  CHARTS['c-pie-fund']=new Chart(document.getElementById('c-pie-fund'),{
+    type:'pie',
+    data:{labels:['เงินประมาณแผ่นดิน','เงินรายได้','เปลี่ยนสถานภาพ'],
+      datasets:[{data:[
+        d.filter(x=>x.fund&&x.fund.includes('ประมาณแผ่นดิน')).length,
+        d.filter(x=>x.fund&&x.fund.includes('รายได้')).length,
+        d.filter(x=>x.fund&&x.fund.includes('เปลี่ยน')).length
+      ],backgroundColor:[TQ,GD,RB],borderColor:['#33c0ca','#e8b84b','#b52324'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,plugins:{tooltip:TOOLTIP,legend:{...LEGOPT,position:'bottom'}}}
+  });
+}
+
+// ══════════════════════
+// TABLE
+// ══════════════════════
+function buildTable(){
+  const tb=document.getElementById('tbl-body');
+  tb.innerHTML='';
+  DATA.forEach((p,i)=>{
+    const tp=p.type==='สายวิชาการ'?'<span class="tag ttq">วิชาการ</span>':'<span class="tag trb">อำนวยการ</span>';
+    const gt=p.g==='ชาย'?'<span class="tag tbl">ชาย</span>':'<span class="tag trb">หญิง</span>';
+    const br=['DE','Comp','DBiz'].includes(p.br)?`<span class="tag ttq">${p.br}</span>`:`<span style="color:var(--muted);font-size:10px">${p.br}</span>`;
+    tb.innerHTML+=`<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td style="color:#c8eaed;font-weight:500">${p.name}</td>
+      <td>${tp}</td><td>${gt}</td>
+      <td style="color:#6a9fa6">${p.rel}</td>
+      <td style="color:var(--gold);font-size:10.5px">${p.pfx}</td>
+      <td>${br}</td>
+      <td style="color:#6a9fa6">${p.edu}</td>
+    </tr>`;
+  });
+}
+
+// ══════════════════════
+// NAVIGATION
+// ══════════════════════
+const SECS=['overview','academic','support','dist','table'];
+function goSec(name,el){
+  SECS.forEach(s=>document.getElementById('sec-'+s).classList.toggle('hidden',s!==name));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(el)el.classList.add('active');
+  setTimeout(()=>{
+    if(name==='overview')buildOverview();
+    else if(name==='academic')buildAcademic();
+    else if(name==='support')buildSupport();
+    else if(name==='dist')buildDist();
+    else if(name==='table')buildTable();
+  },50);
+}
+
+// ══════════════════════
+// OFFLINE FALLBACK
+// ══════════════════════
+const OFFLINE_DATA=[
+  {id:1,g:'ชาย',rel:'อิสลาม',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'รองศาสตราจารย์',pfx:'รศ.ดร.',name:'อซีส นันทอมรพงศ์',br:'DE',edu:'ปริญญาเอก',admin:'คณบดี'},
+  {id:2,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'อดิศักดิ์ อินทนา',br:'DE',edu:'ปริญญาเอก',admin:'รองคณบดี'},
+  {id:3,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'รองศาสตราจารย์',pfx:'รศ.ดร.',name:'วโรดม วีระพันธ์',br:'DE',edu:'ปริญญาเอก',admin:'รองคณบดี'},
+  {id:4,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'วศิมน พาณิชพัฒนกุล',br:'DE',edu:'ปริญญาเอก',admin:'ผู้ช่วยคณบดี'},
+  {id:5,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'กุลจรี ตันตยกุล',br:'DE',edu:'ปริญญาเอก',admin:'ผู้ช่วยคณบดี'},
+  {id:6,g:'หญิง',rel:'อิสลาม',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'กาญจนา เหล่าเส็น',br:'Comp',edu:'ปริญญาเอก',admin:'ผู้ช่วยคณบดี'},
+  {id:7,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'วีราภรณ์ ซิดดู',br:'DBiz',edu:'ปริญญาเอก',admin:'ผู้ช่วยคณบดี'},
+  {id:8,g:'หญิง',rel:'อิสลาม',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'อาจารย์',name:'พัชรี เทพนิมิตร',br:'DE',edu:'ปริญญาโท',admin:'ผู้ช่วยคณบดี'},
+  {id:9,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'อาจารย์',name:'มนชนก ทองเทพ',br:'DE',edu:'ปริญญาโท',admin:'ผู้ช่วยคณบดี'},
+  {id:10,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'รองศาสตราจารย์',pfx:'รศ.ดร.',name:'อภิชาติ หีดนาคราม',br:'DE',edu:'ปริญญาเอก',admin:'-'},
+  {id:11,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'คมสันต์ กาญจนสิทธิ์',br:'DE',edu:'ปริญญาเอก',admin:'-'},
+  {id:12,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'ณัฐพงศ์ ทองเทพ',br:'Comp',edu:'ปริญญาเอก',admin:'ผู้ช่วยอธิการบดี'},
+  {id:13,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'ขวัญกมล ดิฐกัญจน์',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:14,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'ฉกาจกิจ แท่นชัยกุล',br:'DE',edu:'ปริญญาเอก',admin:'ผู้ช่วยอธิการบดี'},
+  {id:15,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เปลี่ยนสถานภาพ',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'จิรวัฒน์ แท่นทอง',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:16,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'วรวิกา วัฒนสุนทร',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:17,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'นวนล ธีระอัมพรพันธุ์',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:18,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'ปาณิศา ตรีพงศ์',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:19,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'ฐิตินันท์ เกลี้ยงสุวรรณ',br:'DE',edu:'ปริญญาเอก',admin:'ประธานหลักสูตร'},
+  {id:20,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'จักรพันธ์ เชาว์ปรีชา',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:21,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'นรเทพ รัตนวิภานนท์',br:'DE',edu:'ปริญญาเอก',admin:'ประธานหลักสูตร'},
+  {id:22,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'มณีเนตร พวงมณี',br:'Comp',edu:'ปริญญาเอก',admin:'ประธานหลักสูตร'},
+  {id:23,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'กฤตศิลป์ ศิลานนท์',br:'DE',edu:'ปริญญาเอก',admin:'ประธานหลักสูตร'},
+  {id:24,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'อมรรัตน์ ประสิทธิ์ศุภโรจน์',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:25,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'อภิชาต วสุธาพิทักษ์',br:'Comp',edu:'ปริญญาเอก',admin:'-'},
+  {id:26,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เปลี่ยนสถานภาพ',rank:'อาจารย์',pfx:'อาจารย์',name:'เลอลักษณ์ บุญล้ำ',br:'DBiz',edu:'ปริญญาโท',admin:'-'},
+  {id:27,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินรายได้',rank:'อาจารย์',pfx:'อาจารย์',name:'อยุทธย์ อินทรประดิษฐ์',br:'DBiz',edu:'ปริญญาโท',admin:'ประธานหลักสูตร'},
+  {id:28,g:'ชาย',rel:'อิสลาม',type:'สายวิชาการ',fund:'เงินรายได้',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.(ป.โท)',name:'กุลวรรธน์ เชาวนวาที',br:'DE',edu:'ปริญญาโท',admin:'-'},
+  {id:29,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'อาจารย์',name:'วิศรุต จันทระ',br:'DE',edu:'ปริญญาโท',admin:'-'},
+  {id:30,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'ณัฐยา แช่มธิติกุล',br:'DBiz',edu:'ปริญญาเอก',admin:'-'},
+  {id:31,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'จามิกร หิรัญรัตน์',br:'DBiz',edu:'ปริญญาเอก',admin:'-'},
+  {id:32,g:'หญิง',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'อาจารย์',name:'กุลศิริ จิรายุส',br:'DE',edu:'ปริญญาโท',admin:'-'},
+  {id:33,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'ผู้ช่วยศาสตราจารย์',pfx:'ผศ.ดร.',name:'จักรพันธ์ สัวบุตร',br:'DE',edu:'ปริญญาเอก',admin:'-'},
+  {id:34,g:'ชาย',rel:'อิสลาม',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'กามาล บาฮะ',br:'DBiz',edu:'ปริญญาเอก',admin:'-'},
+  {id:35,g:'ชาย',rel:'พุทธ',type:'สายวิชาการ',fund:'เงินประมาณแผ่นดิน',rank:'อาจารย์',pfx:'ดร.',name:'ธรรมศาสตร์ วิสุทธารมณ์',br:'DE',edu:'ปริญญาเอก',admin:'-'},
+  {id:36,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'นาย',name:'ศักราช พัฒน์เอี่ยม (โจ)',br:'งานวิจัย',edu:'ปริญญาโท',admin:'-'},
+  {id:37,g:'หญิง',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'น.ส.',name:'วรรณอนงค์ ธันยลาภพิทักษ์ (บัว)',br:'งานวิเทศ',edu:'ปริญญาตรี',admin:'-'},
+  {id:38,g:'หญิง',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'น.ส.',name:'ฐิติมา วศินพัฒนวิศิษฎ์ (ชมพู่)',br:'งานวิชาการ',edu:'ปริญญาตรี',admin:'-'},
+  {id:39,g:'หญิง',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'น.ส.',name:'สุวภัทร จินดา (อ้น)',br:'งานวิชาการ',edu:'ปริญญาโท',admin:'-'},
+  {id:40,g:'หญิง',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'น.ส.',name:'เสาวนีย์ เพชรศรีสังข์ (เอ)',br:'งานวิชาการ',edu:'ปริญญาตรี',admin:'-'},
+  {id:41,g:'หญิง',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'น.ส.',name:'สุปราณี บำรุงภักดิ์ (โอ๋)',br:'งานบริหาร',edu:'ปริญญาตรี',admin:'-'},
+  {id:42,g:'หญิง',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ชำนาญการ',pfx:'น.ส.',name:'เกตุวดี ขอเจริญ (แหม่ม)',br:'งานบริหาร',edu:'ปริญญาโท',admin:'-'},
+  {id:43,g:'หญิง',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'น.ส.',name:'เกวลิน วรรณพรหม (อีฟ)',br:'งานบริหาร',edu:'ปริญญาตรี',admin:'-'},
+  {id:44,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'นาย',name:'อมตวิทย์ คำแหง (โดม)',br:'งานไอที',edu:'ปริญญาตรี',admin:'-'},
+  {id:45,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินประมาณแผ่นดิน',rank:'ปฏิบัติการ',pfx:'นาย',name:'พิชญะ บุญญานุวัตร (โต้ง)',br:'งานไอที',edu:'ปริญญาตรี',admin:'-'},
+  {id:46,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'นาย',name:'พฤทธิ์ เกษตรสมบูรณ์ (จอม)',br:'AMTEC',edu:'ปริญญาตรี',admin:'-'},
+  {id:47,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินประมาณแผ่นดิน',rank:'ปฏิบัติการ',pfx:'นาย',name:'ณัฐวัฒน์ นิธิคุณานนต์ (ปืน)',br:'AMTEC',edu:'ปริญญาตรี',admin:'-'},
+  {id:48,g:'หญิง',rel:'อิสลาม',type:'สายอำนวยการฯ',fund:'เงินประมาณแผ่นดิน',rank:'ชำนาญการ',pfx:'น.ส.',name:'อาภากร บุนนาค (ปราย)',br:'AMTEC',edu:'ปริญญาตรี',admin:'-'},
+  {id:49,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'นาย',name:'อนุพงศ์ รองมาก (พงษ์)',br:'งานไอที',edu:'ปริญญาตรี',admin:'-'},
+  {id:50,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'นาย',name:'เอกวัฒน์ วชิระพันธุ์ (โจ๊ก)',br:'งานไอที',edu:'ปริญญาตรี',admin:'-'},
+  {id:51,g:'ชาย',rel:'อิสลาม',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'นาย',name:'บิลาล หนูชูสุข(บี)',br:'งานวิชาการ',edu:'ปริญญาตรี',admin:'-'},
+  {id:52,g:'ชาย',rel:'พุทธ',type:'สายอำนวยการฯ',fund:'เงินรายได้',rank:'ปฏิบัติการ',pfx:'นาย',name:'ชนะชัย สิริพันธ์วราภรณ์ (ท็อป)',br:'E-sport',edu:'ปริญญาตรี',admin:'-'}
+];
+
+// ══════════════════════
+// INIT — โหลด Sheets อัตโนมัติ
+// ══════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  loadFromSheets();
+});
+</script>
+</body>
+</html>
